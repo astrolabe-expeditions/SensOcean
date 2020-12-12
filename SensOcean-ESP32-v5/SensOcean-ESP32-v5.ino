@@ -41,9 +41,9 @@ Lancement des mesures des le fix trouvé plutot que d'attendre la minute complè
 // ---------------------   PARAMETRES MODIFIABLE DU PROGRAM    -----------------------------------
 // Version et numero de serie
 char numserie[] = "AESO20005";      // Numero de serie de la sonde
-char versoft[] = "5.31";             // version du code
+char versoft[] = "5.4";             // version du code
 
-#define TIME_TO_SLEEP  20           // Durée d'endormissement entre 2 cycles complets de mesures (in seconds)
+#define TIME_TO_SLEEP  600          // Durée d'endormissement entre 2 cycles complets de mesures (in seconds)
 int nbrMes = 3;                     // nombre de mesure de salinité et température par cycle
 
 // --------------------     FIN DES PARAMETRES MODIFIABLES     -----------------------------------
@@ -121,6 +121,7 @@ const unsigned int BATTERY_CAPACITY = 3400; // e.g. 3400mAh battery
 TinyGPSPlus gps;                           
 HardwareSerial Serial1(1);  
 int gpspin=27;
+unsigned long t0;
 
 // déclaration pour capteur de pression (bmp280)
 Adafruit_BMP280 bmp; // I2C Interface
@@ -158,7 +159,7 @@ void setup()
       
       affichageintro();       // texte d'intro et cadre initiale
       Serial.println(" Phase d'introduction ");
-      //delay(3000);
+      delay(4000);            // délai affichage texte intro avant démarrage complet
 
       // Test carte SD
       Serial.print("Initializing SD card...");   
@@ -199,11 +200,26 @@ void setup()
           errormessage();
           delay(3000);   
         }
-
-      //allumer le GPS pour la 1ère recherche de satellite
-      //digitalWrite(gpspin, HIGH);
-
       
+      //allumer le GPS pour la 1ère recherche de satellite
+      affiche_searchfix();                    // ecran recherche GPS fix
+      digitalWrite(gpspin, HIGH);             // GPS on
+      delay(1000);                            // pour que le GPS se reveille tranquillement
+      t0=millis();                            // temporisation pour attendre le fix du GPS et lecture du GPS
+      while(millis()<(t0+300000)){            // attends 300s (5mins que le GPS fix, sinon passe à la suite quand même)
+         //Read the gps
+         smartDelay(1000);  
+         if (millis() > 5000 && gps.charsProcessed() < 10)
+            Serial.println(F("No GPS data received: check wiring")); 
+         // if fix ok, break the while loop   
+         if(gps.location.isUpdated()){
+          affiche_fixok();         // ecran fix ok, maintenant les mesures seront affichés tout les x mins
+          break;
+         }
+         delay(500);
+      }
+      affiche_fixok();         // ecran fix ok, maintenant les mesures seront affichés tout les x mins
+      delay(500);
       bootCount = bootCount+1;   // changement du numéro de compteur pour passer directement dans programm loop apres le reveil
       //Serial.println("Boot number: " + String(bootCount));  //affichage du numéro de boucle depuis que l'instrument est allumé
       
@@ -212,8 +228,20 @@ void setup()
       // ---------------        HERE IS THE MAIN PROGRAMM LOOP         ----------------------------------------------------------
 
       // allume GPS et attend 1 min que le signal soit ok
-      digitalWrite(gpspin, HIGH);   //GPS
-      delay(60000);
+      digitalWrite(gpspin, HIGH);             //GPS on
+      delay(1000);                            // temps de reveil du GPS
+      t0=millis();                            // temporisation pour attendre le fix du GPS et lecture du GPS
+      while(millis()<(t0+60000)){             // attend 1min que le GPS fix sinon passe aux mesures quand même
+         //Read the gps
+         smartDelay(1000);  
+         if (millis() > 5000 && gps.charsProcessed() < 10)
+            Serial.println(F("No GPS data received: check wiring")); 
+         // if fix ok, break the while loop   
+         if(gps.location.isUpdated()){
+          break;
+         }
+         delay(500);
+      }
 
       //allume les capteurs de température et salinité
       digitalWrite(rtdpin, HIGH);   // temp  si allumage des pin
@@ -244,17 +272,16 @@ void setup()
       unsigned int soc = lipo.soc();  // Read state-of-charge (%)
       unsigned int volts = lipo.voltage(); // Read battery voltage (mV)
 
-      //Read the gps
-      smartDelay(1000);  
-      if (millis() > 5000 && gps.charsProcessed() < 10)
-        Serial.println(F("No GPS data received: check wiring")); 
+//      //Read the gps
+//      smartDelay(1000);  
+//      if (millis() > 5000 && gps.charsProcessed() < 10)
+//        Serial.println(F("No GPS data received: check wiring")); 
 
       //Read meteo sensor (bmp280)
       mes_pressure();
 
       //Read internal temperature
       mes_temp_int();
-
           
       // MESURE TEMPERATURE ET CONDUCTIVITE et construction de la chaine de donnée pour enregistrer sur la carte SD
       String datachain ="";
@@ -345,16 +372,14 @@ void setup()
 void loop()
 {
  //never use because of the sleeping of the princess esp32
- // peut être à utiliser pour la fonction wifi
+ // peut être à utiliser pour la fonction wifi ??
 }
 
 
 
 /*
- * *****************************        LISTE DES FONCTION UTILISER DANS LE PROGRAMME            ***********************************
+ * *****************************        LISTE DES FONCTIONS UTILISEES DANS LE PROGRAMME            ***********************************
  */
-
-
 
 
 void affichageintro(){                     // texte intro à l'allumage
@@ -377,13 +402,14 @@ void affichageintro(){                     // texte intro à l'allumage
   display.update();
 }
 
+
 void errormessage(){                     // texte intro à l'allumage
   display.setRotation(3);
   display.fillScreen(GxEPD_WHITE);
   
   //titre
   display.setTextColor(GxEPD_BLACK);
-  display.setFont(f4);
+  display.setFont(f3);
   display.setCursor(25, 55  );
   display.println("  ERROR ");
 
@@ -391,6 +417,35 @@ void errormessage(){                     // texte intro à l'allumage
   display.setFont(f1);
   display.setCursor(30, 90);
   display.print("No SD Card ");
+ 
+  display.update();
+}
+
+
+void affiche_searchfix(){
+  display.setRotation(3);
+  display.fillScreen(GxEPD_WHITE);
+  
+  display.setTextColor(GxEPD_BLACK);
+  display.setFont(f2);
+  display.setCursor(5, 55);
+  display.println("GPS: wait for fix ...");
+ 
+  display.update();
+}
+
+
+void affiche_fixok(){
+  display.setRotation(3);
+  display.fillScreen(GxEPD_WHITE);
+  
+  display.setTextColor(GxEPD_BLACK);
+  display.setFont(f2);
+  display.setCursor(5, 35  );
+  display.println("GPS : fix ok ");
+  display.println("Measures in progress");
+  int measure_delay = TIME_TO_SLEEP/60;
+  display.print("(Every ");display.print(measure_delay);display.println(" mins)");
  
   display.update();
 }
@@ -430,7 +485,6 @@ void mesureRTD(){
     }
     Serial.println(rtdData);            //print the data.  
 }
-
 
 
 void mesureEC(){
@@ -479,8 +533,8 @@ void mesureEC(){
 //  Serial.println(sal);                //this is the salinity value.
 //  Serial.print("SG:");                //we now print each value we parsed separately.
 //  Serial.println(sg);                 //this is the specific gravity.
-
 }
+
 
 void setupBQ27441(void)
 {
@@ -501,6 +555,7 @@ void setupBQ27441(void)
   lipo.setCapacity(BATTERY_CAPACITY);
 }
 
+
 static void smartDelay(unsigned long ms)               
 {
   unsigned long start = millis();
@@ -511,6 +566,7 @@ static void smartDelay(unsigned long ms)
   } while (millis() - start < ms);
 }
 
+
 void mes_temp_int(){    // température interne du boitier pour info
   sensors.begin();
   delay(500);
@@ -520,7 +576,6 @@ void mes_temp_int(){    // température interne du boitier pour info
   Serial.println(tempint, 3);   // We use the function ByIndex, and as an example get the temperature from the first sensor only.
     
 }
-
 
 
 void mes_pressure(){         // capteur meteo, température et pression
