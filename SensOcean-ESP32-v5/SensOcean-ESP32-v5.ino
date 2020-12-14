@@ -26,6 +26,7 @@ Remarque : attention pour les lib ecran : penser a changer les point cpp en .h
 Etat du programme : 
 -------------------
 fonctionne ok
+Ajout de gestion de fichier sur carte SD : création d'un fichier au nom de la date a chaque allumage du boitier. (max de 100 fichiers par jours)
 Ajout de la gestion allumage et extinction du gps via pin 27n et transistor
 
 Pour la prochain version : 
