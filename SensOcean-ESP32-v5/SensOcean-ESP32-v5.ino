@@ -41,9 +41,9 @@ Lancement des mesures des le fix trouvé plutot que d'attendre la minute complè
 // ---------------------   PARAMETRES MODIFIABLE DU PROGRAM    -----------------------------------
 // Version et numero de serie
 char numserie[] = "AESO20005";      // Numero de serie de la sonde
-char versoft[] = "5.4";             // version du code
+char versoft[] = "5.5";             // version du code
 
-#define TIME_TO_SLEEP  600          // Durée d'endormissement entre 2 cycles complets de mesures (in seconds)
+#define TIME_TO_SLEEP  600          // Durée d'endormissement entre 2 cycles complets de mesures (in seconds) par défault 600
 int nbrMes = 3;                     // nombre de mesure de salinité et température par cycle
 
 // --------------------     FIN DES PARAMETRES MODIFIABLES     -----------------------------------
@@ -81,7 +81,7 @@ const GFXfont* f4 = &FreeMonoBold24pt7b;
 // definition pour la fonction deepsleep de l'ESP32
 #define uS_TO_S_FACTOR 1000000      // Conversion factor for micro seconds to seconds
 RTC_DATA_ATTR int bootCount = 0;    // utile pour enregistrer un compteur dans la memoire rtc de l'ULP pour un compteur permettant un suivi entre chaque veille
-
+RTC_DATA_ATTR int filenumber = 0;      // nom de fichier pour le garder entre l'initialisation (1er boot) et les mesures (tout les autres boots)
 
 // definition pour les carte Atlas
 #define ecAddress 100 
@@ -112,7 +112,8 @@ bool PM;
 //byte ADay, AHour, AMinute, ASecond, ABits;
 //bool ADy, A12h, Apm;
 //byte year, month, date, DoW, hour, minute, second;
-int second,minute,hour,date,month,year; 
+String second,minute,hour,date,month,year; 
+String datenum, timenum;                   // pour format de date en 1 seule écriture
 
 // Set BATTERY_CAPACITY to the design capacity of your battery.
 const unsigned int BATTERY_CAPACITY = 3400; // e.g. 3400mAh battery
@@ -133,6 +134,10 @@ float pres_ext;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 float tempint;
+
+//déclaration pour la gestion de fichier sur la carte SD
+String filename, filename_temp, str_index, filetrans;
+int ind;                  // index vérification de fichier
 
 
 
@@ -158,7 +163,7 @@ void setup()
       // --------------        HERE IS ONLY THE INTRODUCION           -----------------------------------------------------------
       
       affichageintro();       // texte d'intro et cadre initiale
-      Serial.println(" Phase d'introduction ");
+      Serial.println(" ----- Phase d'introduction --------- ");
       delay(4000);            // délai affichage texte intro avant démarrage complet
 
       // Test carte SD
@@ -170,6 +175,72 @@ void setup()
         return;
       }
       Serial.println("card initialized.");   
+
+
+      //allumer le GPS pour la 1ère recherche de satellite
+      affiche_searchfix();                    // ecran recherche GPS fix
+      digitalWrite(gpspin, HIGH);             // GPS on
+      delay(1000);                            // pour que le GPS se reveille tranquillement
+      t0=millis();                            // temporisation pour attendre le fix du GPS et lecture du GPS
+      while(millis()<(t0+300000)){            // attends 300s (5mins que le GPS fix, sinon passe à la suite quand même)
+         //Read the gps
+         smartDelay(1000);  
+         if (millis() > 5000 && gps.charsProcessed() < 10)
+            Serial.println(F("No GPS data received: check wiring")); 
+         // if fix ok, break the while loop   
+         if(gps.location.isUpdated()){
+          affiche_fixok();         // ecran fix ok, maintenant les mesures seront affichés tout les x mins
+          break;
+         }
+         delay(500);
+      }
+      affiche_fixok();         // ecran fix ok, maintenant les mesures seront affichés tout les x mins
+      delay(500);
+
+      // Ajouter ici plus tard une synchro entre l'horloge et le GPS si fix ???
+
+      // lecture de l'horloge rtc pour création de nom de fichier
+      int sec=Clock.getSecond();
+      if(sec<10){second = String(0) + String(sec);}
+      else{second = sec;}
+      int minu=Clock.getMinute();
+      if(minu<10){minute = String(0) + String(minu);}
+      else{minute = minu;}
+      int heure=Clock.getHour(h12, PM);
+      if(heure<10){hour = String(0) + String(heure);}
+      else{hour = heure;}
+      int jour=Clock.getDate();
+      if(jour<10){date = String(0) + String(jour);}
+      else{date = jour;}
+      int mois=Clock.getMonth(Century);
+      if(mois<10){month = String(0) + String(mois);}
+      else{month = mois;}
+      year=Clock.getYear();
+      datenum =""; datenum +=year; datenum +=month; datenum +=date;
+      timenum =""; timenum +=hour; timenum +=minute; timenum +=second;
+
+      // création du nom de fichier et écriture sur la carte SD en automatisant la vérification de fichiers existant.
+      filename =""; filename +="/"; filename += datenum;
+      filename_temp = filename + String(0)+ String(0) + ".csv";           //1er fichier du jour
+      int ind=0;
+
+      while(SD.exists(filename_temp)){                             // vérifie l'existantce de fichier dans un boucle en indexant le numéro de fichier
+        ind++;       
+        if(ind<10){
+          str_index=String(0)+String(ind);
+        }
+        else{
+          str_index=String(ind);
+        }
+        filename_temp = filename + str_index + ".csv";
+      }
+
+      filename = filename_temp;   // création du nom de fichier final
+
+      //convertion du nom de fichier en int pour transfert en memoire RTC
+      filetrans = datenum + str_index;
+      filenumber = filetrans.toInt();
+      
 
       //Make the first line of datachain
       datachain += "lat" ; datachain += " ; "; datachain += "Lng" ; datachain += " ; "; 
@@ -190,36 +261,23 @@ void setup()
       Serial.println(datachain);
 
      // enregistrement de la datachain sur la carte SD
-        File dataFile = SD.open("/datalog.txt", FILE_APPEND);
+        File dataFile = SD.open(filename, FILE_APPEND);
         if (dataFile) {                                        // if the file is available, write to it:
           dataFile.println(datachain);
           dataFile.close();
+          Serial.println("Fichier créer avec succés");
+          Serial.print("Filename : "); Serial.println(filename);
+          Serial.print("File number : "); Serial.println(filenumber);
         }
         else {                                                 // if the file isn't open, pop up an error:
-          Serial.println("error opening datalog.txt"); 
+          Serial.println("error opening file"); 
           errormessage();
           delay(3000);   
         }
-      
-      //allumer le GPS pour la 1ère recherche de satellite
-      affiche_searchfix();                    // ecran recherche GPS fix
-      digitalWrite(gpspin, HIGH);             // GPS on
-      delay(1000);                            // pour que le GPS se reveille tranquillement
-      t0=millis();                            // temporisation pour attendre le fix du GPS et lecture du GPS
-      while(millis()<(t0+300000)){            // attends 300s (5mins que le GPS fix, sinon passe à la suite quand même)
-         //Read the gps
-         smartDelay(1000);  
-         if (millis() > 5000 && gps.charsProcessed() < 10)
-            Serial.println(F("No GPS data received: check wiring")); 
-         // if fix ok, break the while loop   
-         if(gps.location.isUpdated()){
-          affiche_fixok();         // ecran fix ok, maintenant les mesures seront affichés tout les x mins
-          break;
-         }
-         delay(500);
-      }
-      affiche_fixok();         // ecran fix ok, maintenant les mesures seront affichés tout les x mins
+
+       
       delay(500);
+
       bootCount = bootCount+1;   // changement du numéro de compteur pour passer directement dans programm loop apres le reveil
       //Serial.println("Boot number: " + String(bootCount));  //affichage du numéro de boucle depuis que l'instrument est allumé
       
@@ -227,11 +285,17 @@ void setup()
   {
       // ---------------        HERE IS THE MAIN PROGRAMM LOOP         ----------------------------------------------------------
 
-      // allume GPS et attend 1 min que le signal soit ok
+      Serial.println(" ----_ START LOOP ------");
+
+      Serial.print("File number : "); Serial.println(filenumber);
+      filename = ""; filename += "/"; filename += String(filenumber); filename += ".csv";
+      Serial.print(" File name : ");Serial.println(filename);
+      
+      // allume GPS et attend 1min30s que le signal soit ok
       digitalWrite(gpspin, HIGH);             //GPS on
       delay(1000);                            // temps de reveil du GPS
       t0=millis();                            // temporisation pour attendre le fix du GPS et lecture du GPS
-      while(millis()<(t0+60000)){             // attend 1min que le GPS fix sinon passe aux mesures quand même
+      while(millis()<(t0+90000)){             // attend 1min30s que le GPS fix sinon passe aux mesures quand même
          //Read the gps
          smartDelay(1000);  
          if (millis() > 5000 && gps.charsProcessed() < 10)
@@ -259,14 +323,25 @@ void setup()
       Serial.println("card initialized.");           
 
       // lecture de l'horloge rtc
-      int second,minute,hour,date,month,year; 
-      //second=Clock.getSecond();
-      second=Clock.getSecond();
-      minute=Clock.getMinute();
-      hour=Clock.getHour(h12, PM);
-      date=Clock.getDate();
-      month=Clock.getMonth(Century);
+      int sec=Clock.getSecond();
+      if(sec<10){second = String(0) + String(sec);}
+      else{second = sec;}
+      int minu=Clock.getMinute();
+      if(minu<10){minute = String(0) + String(minu);}
+      else{minute = minu;}
+      int heure=Clock.getHour(h12, PM);
+      if(heure<10){hour = String(0) + String(heure);}
+      else{hour = heure;}
+      int jour=Clock.getDate();
+      if(jour<10){date = String(0) + String(jour);}
+      else{date = jour;}
+      int mois=Clock.getMonth(Century);
+      if(mois<10){month = String(0) + String(mois);}
+      else{month = mois;}
       year=Clock.getYear();
+      datenum =""; datenum +=year; datenum +=month; datenum +=date;
+      timenum =""; timenum +=hour; timenum +=minute; timenum +=second;
+
       
       // Read battery stats from the BQ27441-G1A
       unsigned int soc = lipo.soc();  // Read state-of-charge (%)
@@ -306,13 +381,13 @@ void setup()
         }
 
         // enregistrement sur la carte SD
-          File dataFile = SD.open("/datalog.txt", FILE_APPEND);
+          File dataFile = SD.open(filename, FILE_APPEND);
           if (dataFile) {                                        // if the file is available, write to it:
             dataFile.println(datachain);
             dataFile.close();
           }
           else {                                                 // if the file isn't open, pop up an error:
-            Serial.println("error opening datalog.txt");  
+            Serial.println("error opening file");  
             errormessage();
             delay(3000);  
           }
