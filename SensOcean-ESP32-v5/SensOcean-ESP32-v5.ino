@@ -26,6 +26,7 @@ Remarque : attention pour les lib ecran : penser a changer les point cpp en .h
 Etat du programme : 
 -------------------
 fonctionne ok
+Ajout fonction calcul salinité
 Ajout de gestion de fichier sur carte SD : création d'un fichier au nom de la date a chaque allumage du boitier. (max de 100 fichiers par jours)
 Ajout de la gestion allumage et extinction du gps via pin 27n et transistor
 
@@ -42,10 +43,10 @@ Lancement des mesures des le fix trouvé plutot que d'attendre la minute complè
 // ---------------------   PARAMETRES MODIFIABLE DU PROGRAM    -----------------------------------
 // Version et numero de serie
 char numserie[] = "AESO20005";      // Numero de serie de la sonde
-char versoft[] = "5.5";             // version du code
+char versoft[] = "5.54";             // version du code
 
 #define TIME_TO_SLEEP  600          // Durée d'endormissement entre 2 cycles complets de mesures (in seconds) par défault 600
-int nbrMes = 3;                     // nombre de mesure de salinité et température par cycle
+int nbrMes = 3;                     // nombre de mesure de salinité et température par cycle par déafuatl 3
 
 // --------------------     FIN DES PARAMETRES MODIFIABLES     -----------------------------------
 
@@ -103,6 +104,14 @@ char *sg;                           // Char pointer used in string parsing.
 String datachain;                   // chaine de donnée texte de mesure                 
 int ecpin =12;
 int rtdpin=14;
+
+// déclaration initiale des variables de la fonction cal_sal (Aminot A., Kérouel R. (2004), Hydrologie des écosystèmes marins. Paramètres et analyses. Cf pages 74-78)
+int Rp = 1;             
+float a[] = {0.0080, -0.1692, 25.3851, 14.0941, -7.0261, 2.7081};
+float b[] = {0.0005, -0.0056, -0.0066, -0.0375, 0.0636, -0.0144};
+float c[] = {0.6766097, 0.0200564, 0.0001104259, -6.9698E-07, 1.0031E-09};
+float k = 0.0162;
+float rt, R_t, S, modA, modB;
 
 
 //déclaration pour horloge
@@ -405,15 +414,22 @@ void setup()
 
       display.setRotation(3);
       display.fillScreen(GxEPD_WHITE);
+
+      // calcul salinité à afficher
+      float temp = atof(rtdData);
+      float cond = atof(ecData)/1000;
+      Serial.print(" Temp = "); Serial.println(temp);
+      Serial.print(" Cond = "); Serial.println(cond);
+      cal_sal(temp, cond);
       
       //data
       display.setTextColor(GxEPD_BLACK);
       display.setFont(f3);
       display.setCursor(10, 40); display.println(rtdData);
-      display.setCursor(172,40); display.println(ecData);    // mettre salfinal si affichage de salinité
+      display.setCursor(172,40); display.println(S);   
       display.setFont(f2);
       display.setCursor(40,70);display.print("deg C");
-      display.setCursor(200,70);display.print("EC");
+      display.setCursor(200,70);display.print("PSU");
     
       //cadre
       display.fillRect(147, 0, 2, 90, GxEPD_BLACK);
@@ -609,6 +625,28 @@ void mesureEC(){
 //  Serial.println(sal);                //this is the salinity value.
 //  Serial.print("SG:");                //we now print each value we parsed separately.
 //  Serial.println(sg);                 //this is the specific gravity.
+}
+
+
+void cal_sal(float t, float C){         // fonction sinplifié à intégrer dans un code
+  // calcul intermédiaire 
+  int i;
+  rt=0;                                 // réinitilisation entre chaque boucle
+  for (i=0; i<5; i++){                  // calcul de rt
+    rt += c[i]*pow(t,float(i));
+  }
+
+  R_t= C /(42.914*rt);                  // calcul de R_t
+
+  modA =0; modB=0;                      // réinitilisation entre chaque boucle
+  for (i=0; i<6;i++){                   // cal modA et modB
+    modA += a[i]*pow(R_t,float(i/2));
+    modB += b[i]*pow(R_t,float(i/2));
+  }
+
+  //cal salinité
+  S = modA+((t-15)/(1+k*(t-15)))*modB;
+  Serial.print("Salinité = "); Serial.println(S,4);
 }
 
 
