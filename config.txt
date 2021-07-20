@@ -1,0 +1,9 @@
+id_logger=AESO21006;   Ne pas toucher de chiffre
+nom_bateau=NorthAbout; Entrez ici le nom de votre bateau
+nom_skipper=Tobias;    Entrez ici votre nom
+delay_series=10;       Temp en seconde, temps de mise en veille entre 2 series de mesures (900s par défault)
+number_measures=1;     Nombre de  mesures (3 par défaults)
+mode_instrum=0;        0=data  1=envoi par wifi
+gps_1stDelay=1;      En seconde delay pour chercher la 1er connexion avant de passer de force à la suite (180s par défault)
+gps_delay=1;          En seconde, temps autoriser pour chercher le GPS à chaque serie de mesure (60s par défault)
+clef_test=42;          Ne pas oublier de taper "retour à la ligne aprés la derniére ligne de config
