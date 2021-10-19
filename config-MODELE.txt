@@ -1,0 +1,15 @@
+CONFIG MODELE
+le fichier doit s'appeller config.txt et être à la racine de la carte SD
+
+----
+id_logger=AESO0XX;   Ne pas toucher de chiffre
+nom_bateau=kiki; Entrez ici le nom de votre bateau
+nom_skipper=Ced Ced;    Entrez ici votre nom
+delay_series=900;       Temp en seconde, temps de mise en veille entre 2 series de mesures (900s par défault)
+number_measures=5;     Nombre de  mesures (5 par défaults)
+mode_instrum=0;        0=data  1=envoi par wifi
+gps_1stDelay=240;        En seconde delay pour chercher la 1er connexion avant de passer de force à la suite (240s par défault)
+gps_delay=90;           En seconde, temps autoriser pour chercher le GPS à chaque serie de mesure (90s par défault)
+mode_pompe=0;          0 si pas de systeme de pompe, 1 si systeme de pompe...
+delay_pompe=60;        Durée d'allumage de la pompe à eau
+clef_test=42;          Ne pas oublier de taper "retour à la ligne aprés la derniére ligne de config

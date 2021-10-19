@@ -40,22 +40,28 @@ Utiliser les nouvelles librairies Atlas
 
 
 // ---------------------   PARAMETRES MODIFIABLE DU PROGRAM    -----------------------------------
-char versoft[] = "6.1";                     // version du code
+char versoft[] = "6.31";                     // version du code
 String fichier_config = "/config.txt";      // nom du fichier de configuration
 int delay_affichage_ecran=4;                // en seconde
 
 // --------------------     FIN DES PARAMETRES MODIFIABLES     -----------------------------------
 
 // Library
-#include <GxEPD.h>                      // Epaper Screen
-//#include <GxGDEW042T2/GxGDEW042T2.h>    // Epaper Screen 4.2" b/w
-#include <GxGDEH029A1/GxGDEH029A1.h>    // Epaper Screen 2.9" b/w
+// if epaper v1
+//#include <GxEPD.h>                      // Epaper Screen
+////#include <GxGDEW042T2/GxGDEW042T2.h>    // Epaper Screen 4.2" b/w
+//#include <GxGDEH029A1/GxGDEH029A1.h>    // Epaper Screen 2.9" b/w
+//#include <GxIO/GxIO_SPI/GxIO_SPI.h>     // epaper sceeen
+//#include <GxIO/GxIO.h>                  // epaper screen
+
+// if epaper v2
+#include <GxEPD2_BW.h> 
+#include <GxEPD2_3C.h> 
+
 #include <Fonts/FreeMonoBold9pt7b.h>    // font for epaper sreen
 #include <Fonts/FreeMonoBold12pt7b.h>   // font for epaper sreen
 #include <Fonts/FreeMonoBold18pt7b.h>   // font for epaper sreen
 #include <Fonts/FreeMonoBold24pt7b.h>   // font for epaper sreen
-#include <GxIO/GxIO_SPI/GxIO_SPI.h>     // epaper sceeen
-#include <GxIO/GxIO.h>                  // epaper screen
 #include <Wire.h>                       //enable I2C.
 #include <DS3231.h>                     // Pour horloge RTC
 #include "SPI.h"                        // pour connection ecran bus SPI
@@ -66,9 +72,13 @@ int delay_affichage_ecran=4;                // en seconde
 #include <OneWire.h>                    // pour capteur ds18b20
 #include <DallasTemperature.h>          // pour capteur ds18b20
 
-//SPI pin definitions pour ecran epaper
-GxIO_Class io(SPI, /*CS=5*/ 0, /*DC=*/ 13, /*RST=*/ 25); // arbitrary selection of 17, 16  //SS remplacé par 0
-GxEPD_Class display(io, /*RST=*/ 25, /*BUSY=*/ 4); // arbitrary selection of (16), 4
+//SPI pin definitions pour ecran epaper V1
+//GxIO_Class io(SPI, /*CS=5*/ 0, /*DC=*/ 13, /*RST=*/ 25); // arbitrary selection of 17, 16  //SS remplacé par 0
+//GxEPD_Class display(io, /*RST=*/ 25, /*BUSY=*/ 4); // arbitrary selection of (16), 4
+
+// spi pin definitons pour ecran V2
+GxEPD2_BW<GxEPD2_290_T94_V2, GxEPD2_290_T94_V2::HEIGHT> display(GxEPD2_290_T94_V2(/*CS=5*/ 0, /*DC=*/ 13, /*RST=*/ 25, /*BUSY=*/ 4)); // GDEM029T94, Waveshare 2.9" V2 variant
+
 
 // définition pour les fonts ecran
 const GFXfont* f1 = &FreeMonoBold9pt7b;
@@ -146,9 +156,14 @@ float tempint;
 int cspin_SD=5;
 String filename, filename_temp, str_index, filetrans;
 int ind;                  // index vérification de fichier
-String id_logger,number_measures,delay_series, mode_instrum, clef_test, nom_bateau, nom_skipper, gps_1stDelay, gps_delay;
+int gps_timer=0;
+String id_logger,number_measures,delay_series, mode_instrum, clef_test, nom_bateau, nom_skipper, gps_1stDelay, gps_delay, mode_pompe, delay_pompe;
 File confFile;
+int pompe, tps_pompe;
 
+// déclaration pour la pompe à eau
+// Pour le moment la pompe à eau est branché sur la prise Vcc du GPS, il faut donc gérer le temps d'allumage de la pompe avec le temps d'allumage du GPS
+int pompepin=26;
 
 void setup()
 {
@@ -161,6 +176,8 @@ void setup()
   display.init();                              // enable display Epaper
   delay(500); //Take some time to open up the Serial Monitor and enable all things
   pinMode(gpspin, OUTPUT);            // définition GPS
+  pinMode(pompepin, OUTPUT);
+  digitalWrite(pompepin, LOW);
   
   test_sd();
   lecture_config();
@@ -169,6 +186,8 @@ void setup()
   nbrMes=number_measures.toInt();
   gps_tempo_start=gps_1stDelay.toInt()*1000;
   gps_tempo=gps_delay.toInt()*1000;
+  pompe=mode_pompe.toInt();
+  tps_pompe=delay_pompe.toInt()*1000;
 
   if(bootCount == 0) //Run this only the first time
   {
@@ -280,24 +299,51 @@ void setup()
       Serial.print("File number : "); Serial.println(filenumber);
       filename = ""; filename += "/"; filename += String(filenumber); filename += ".csv";
       Serial.print(" File name : ");Serial.println(filename);
-      
-      // allume GPS et attend 1min30s que le signal soit ok
-      digitalWrite(gpspin, HIGH);             //GPS on
-      delay(1000);                            // temps de reveil du GPS
-      t0=millis();                            // temporisation pour attendre le fix du GPS et lecture du GPS
-      int gps_timer = t0+gps_tempo;
-      while(millis()<gps_timer){             // attend le delay imposer par config.txt que le GPS fix sinon passe aux mesures quand même
-         //Read the gps
-         smartDelay(1000);  
-         if (millis() > 5000 && gps.charsProcessed() < 10)
-            Serial.println(F("No GPS data received: check wiring")); 
-         // if fix ok, break the while loop   
-         if(gps.location.isUpdated()){
-          Serial.println("FIX GPS OK");
-          break;
-         }
-         delay(500);
-      }
+
+     // on vérifie si on est en mode pompage ou en mode mesure direct et on choisit la temporisation en fonction
+
+     Serial.print("ETAT POMPE :"); Serial.println(pompe);
+     if(pompe==0){  
+          Serial.println("On est en mode PAS DE POMPE");
+          // allume GPS et attend que le signal soit ok (temps définit dans le fichier config.txt)
+          digitalWrite(gpspin, HIGH);             // GPS + pompe (circuit 5v) sur on
+          delay(1000);                            // temps de reveil du GPS
+          t0=millis();                            // temporisation pour attendre le fix du GPS et lecture du GPS
+          int gps_timer = t0+gps_tempo;
+          while(millis()<gps_timer){             // attend le delay imposer par config.txt que le GPS fix sinon passe aux mesures quand même
+             //Read the gps
+             smartDelay(1000);  
+             if (millis() > 5000 && gps.charsProcessed() < 10)
+                Serial.println(F("No GPS data received: check wiring")); 
+             // if fix ok, break the while loop   
+             if(gps.location.isUpdated()){
+              Serial.println("FIX GPS OK");
+              break;
+             }
+             delay(500);
+          }
+     }
+     else{
+         Serial.println("on est en mode SHADOK");
+         digitalWrite(gpspin, HIGH);             // GPS
+         digitalWrite(pompepin, HIGH);           // on allume la pompe avec la commande du relai
+         delay(1000);
+          t0=millis();          
+          int gps_timer = t0+tps_pompe;
+          while(millis()<gps_timer){             // attend le delay imposer par config.txt que le GPS fix sinon passe aux mesures quand même
+             //Read the gps
+             smartDelay(1000);  
+             if (millis() > 5000 && gps.charsProcessed() < 10)
+                Serial.println(F("No GPS data received: check wiring")); 
+             // if fix ok, break the while loop   
+             if(gps.location.isUpdated()){
+              Serial.println("FIX GPS OK");
+              //break;
+             }
+             delay(500);
+          }
+         
+     }
 
 
 //      //allume les capteurs de température et salinité
@@ -381,10 +427,12 @@ void setup()
       display.setTextColor(GxEPD_BLACK);
       display.setFont(f3);
       display.setCursor(10, 40); display.println(rtdData);
-      display.setCursor(172,40); display.println(S);   
+      //display.setCursor(172,40); display.println(S);   
       display.setFont(f2);
       display.setCursor(40,70);display.print("deg C");
-      display.setCursor(200,70);display.print("PSU");
+      display.setCursor(172,40);display.print("EC:");display.print(ecData);
+      display.setCursor(172,70);display.print("S :");display.print(S);
+      //display.setCursor(200,70);display.print("PSU");
     
       //cadre
       display.fillRect(147, 0, 2, 90, GxEPD_BLACK);
@@ -398,17 +446,15 @@ void setup()
       display.setCursor(0, 125); display.print("Lat:");display.print(gps.location.lat(), 5);                                                     //lattitude
       display.setCursor(148,125); display.print("Lng:");display.print(gps.location.lng(), 4);                                                   //longitude
      
-      display.update();
+      //display.update();        // pour ecran V1
+      display.nextPage();  //  pour ecran V2 
 
       // on éteint tout les composants  
-      //digitalWrite(rtdpin, LOW);   // temp
-      //digitalWrite(ecpin, LOW);   // ec
-      digitalWrite(gpspin, LOW);  // gps
-      veille_ezos(); // veille des cartes atlas
-
-
+      digitalWrite(gpspin, LOW);  // On éteint gps et pompe
+      digitalWrite(pompepin, LOW);
+      veille_ezos();              // On met en veille des cartes atlas
          
-      delay(500); // pour etre sur que tout soit bien éteind
+      delay(500); // pour etre sur que tout soit bien éteint
              
   } // -------    fin Boucle exécution du programme (if pour l'intro, et else pour le programme principal)      --------------------
   
@@ -450,7 +496,8 @@ void affichageintro1(){                     // texte intro à l'allumage
   display.setCursor(30, 110);
   display.print("Ver Soft  :");display.print(versoft);
  
-  display.update();
+      //display.update();        // pour ecran V1
+      display.nextPage();  //  pour ecran V2 
 }
 
 void affichageintro2(){                     // texte intro à l'allumage
@@ -466,7 +513,8 @@ void affichageintro2(){                     // texte intro à l'allumage
   display.setCursor(1, 90);
   display.print("Measures by series :");display.print(number_measures);
  
-  display.update();
+      //display.update();        // pour ecran V1
+      display.nextPage();  //  pour ecran V2 
 }
 
 
@@ -486,7 +534,8 @@ void errormessage(){                     // Message d'erreur sur l'ecran
   display.setCursor(30, 90);
   display.print("No SD Card ");
  
-  display.update();
+      //display.update();        // pour ecran V1
+      display.nextPage();  //  pour ecran V2 
 }
 
 
@@ -499,7 +548,8 @@ void affiche_searchfix(){                 //message de recherche de GPS
   display.setCursor(5, 55);
   display.println("GPS: wait for fix ...");
  
-  display.update();
+      //display.update();        // pour ecran V1
+      display.nextPage();  //  pour ecran V2 
 }
 
 
@@ -518,7 +568,8 @@ void affiche_fixok(){                     //message GPS ok et affiche delay entr
   display.print("Every ");display.print(measure_delay);display.println(" mins");
 
   display.print("Filename:");display.print(filename);
-  display.update();
+      //display.update();        // pour ecran V1
+      display.nextPage();  //  pour ecran V2 
 }
 
 
@@ -784,8 +835,11 @@ void lecture_config(){
                 if (clef == "number_measures") number_measures = valeur;
                 if (clef == "mode_instrum") mode_instrum = valeur;
                 if (clef == "gps_1stDelay") gps_1stDelay = valeur;
-                if (clef == "gps_delay") gps_delay = valeur;               
+                if (clef == "gps_delay") gps_delay = valeur;   
+                if (clef == "mode_pompe") mode_pompe = valeur;
+                if (clef == "delay_pompe") delay_pompe = valeur;                             
                 if (clef == "clef_test") clef_test = valeur;
+                
               }
             }
           }          
