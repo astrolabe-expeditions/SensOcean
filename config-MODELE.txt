@@ -13,3 +13,12 @@ gps_delay=90;           En seconde, temps autoriser pour chercher le GPS à chaq
 mode_pompe=0;          0 si pas de systeme de pompe, 1 si systeme de pompe...
 delay_pompe=60;        Durée d'allumage de la pompe à eau
 clef_test=42;          Ne pas oublier de taper "retour à la ligne aprés la derniére ligne de config
+
+
+---
+
+Ajouter toutes les valeur par default, + les min/max autorisé
+
+Ajouter :
+
+mode_de_fonctionnent=0 ; 0=mesure_insitu, 1=labo, 2=debbug, 3= demo_salon
