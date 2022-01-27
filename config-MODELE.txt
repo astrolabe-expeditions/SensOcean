@@ -1,6 +1,7 @@
 CONFIG MODELE
 le fichier doit s'appeller config.txt et être à la racine de la carte SD
 
+SEUL LES LIGNES ENTRE LES TIRETS DOIVENT ÊTRE COPIER SUR UN CARTE MINI-SD
 ----
 id_logger=AESO0XX;   Ne pas toucher de chiffre
 nom_bateau=kiki; Entrez ici le nom de votre bateau
@@ -12,13 +13,24 @@ gps_1stDelay=240;        En seconde delay pour chercher la 1er connexion avant d
 gps_delay=90;           En seconde, temps autoriser pour chercher le GPS à chaque serie de mesure (90s par défault)
 mode_pompe=0;          0 si pas de systeme de pompe, 1 si systeme de pompe...
 delay_pompe=60;        Durée d'allumage de la pompe à eau
-clef_test=42;          Ne pas oublier de taper "retour à la ligne aprés la derniére ligne de config
+
+------------------------
 
 
----
+Configuration du boitier : 
+----------------------------
+Pour modifier la configuration du boitier il suffit de modifier ce fichier config.txt sur la carte SD
+id_logger : numéro marqué sur le boitier à l'intérieur. 
+delay_series : durée en secondes de mise en veille entre chaque series de mesures
+number_measures : nombre de mesure durant chaque serie
 
+Par d'espace avant ou aprés le =, et retour à la ligne directement aprés la valeur (sans espace à la fin).v
+
+
+************************
+************************
+
+A modifier pour les prochaines version
 Ajouter toutes les valeur par default, + les min/max autorisé
-
-Ajouter :
 
 mode_de_fonctionnent=0 ; 0=mesure_insitu, 1=labo, 2=debbug, 3= demo_salon

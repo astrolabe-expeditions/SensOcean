@@ -1,4 +1,4 @@
-/*********************************************************** 
+ /*********************************************************** 
   
           ASTROLABE EXPEDITIONS - PROGRAMME SENSOCEAN
   Sonde de mesures de temperature et de salitnité de surface
@@ -131,7 +131,7 @@ String second,minute,hour,date,month,year;
 String datenum,timenum,fulltime,fulldate;                   // pour format de date en 1 seule écriture
 
 // Set BATTERY_CAPACITY to the design capacity of your battery.
-const unsigned int BATTERY_CAPACITY = 3400; // e.g. 3400mAh battery
+const unsigned int BATTERY_CAPACITY = 10800; // e.g. 3400mAh battery
 
 // definition pour GPS
 TinyGPSPlus gps;                           
