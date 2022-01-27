@@ -2,18 +2,18 @@
 
 _SensOcean est un programme de sciences participative d’océanographie physique qui permet d'étudier l'océan global, les courants marins et le climat grâce à la particiption de bateau volontaire en haute mer. Ces bateaux vont installer l'instrument de mesure "kit SensOcean" pour enregistrer les paramètres physiue de l'eau durant leurs voyages._
 
-**Le kit SensOcean permet de mesurer : **
+** Le kit SensOcean permet de mesurer : **
 - Température et Salinité de l'eau de mer
 - température et pression atmosphérique
 - position GPS des points de mesures et du trajet, ainsi que la date et l'heure.
 
-**Les liens du programme : **
+** Les liens du programme : **
 - Site web du programme : https://www.astrolabe-expeditions.org/programme-de-sciences/sensocean/
 - Wikifactory pour construire l'instrument : https://wikifactory.com/+astrolabeexpeditions/sensocean
 - Github du code de l'instrument de mesure : https://github.com/astrolabe-expeditions/SensOcean﻿
 - Schéma electronique de l'instrument : https://oshwlab.com/Astrolabe-Expeditions/sensocean_instrument
 
-**Ce github contient : **
+** Ce github contient : **
 - Le logiciel pour faire fonctionne l'instrument
 - Les librairies pour que le logiciel fonctionne
 - Les étapes de configuration et d'installation de l'instrument
