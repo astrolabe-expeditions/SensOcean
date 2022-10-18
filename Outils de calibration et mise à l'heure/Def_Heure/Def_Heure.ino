@@ -16,6 +16,11 @@ int donnee; // données reçues sur la liaison série
 
 void setup() {
   Serial.begin(115200);
+
+  // seulement si besoin avec alim commandée
+  pinMode(4, OUTPUT);
+  digitalWrite(4, HIGH);
+  
   // put your setup code here, to run once:
   //Initilisation wire pour rtc
   Wire.begin();
@@ -29,11 +34,11 @@ void loop() {
     donnee = Serial.read();
     // set time
     Clock.setSecond(00);//Set the second
-    Clock.setMinute(44);//Set the minute
-    Clock.setHour(15);  //Set the hour
-    Clock.setDoW(07);    //Set the day of the week
-    Clock.setDate(23);  //Set the date of the month
-    Clock.setMonth(1);  //Set the month of the year
+    Clock.setMinute(38);//Set the minute
+    Clock.setHour(12);  //Set the hour
+    Clock.setDoW(04);    //Set the day of the week
+    Clock.setDate(15);  //Set the date of the month
+    Clock.setMonth(9);  //Set the month of the year
     Clock.setYear(22);  //Set the year (Last two digits of the year)
     Clock.setClockMode(false); // pour avoir le format 24h
     Serial.println("synchro ok");
