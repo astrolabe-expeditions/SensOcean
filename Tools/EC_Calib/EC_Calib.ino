@@ -34,8 +34,8 @@ float sg_float;                  //float var used to hold the float value of the
 
 void setup()                     //hardware initialization.
 {
-  pinMode(4, OUTPUT);
-  digitalWrite(4, HIGH);
+  pinMode(14, OUTPUT);             // ou 4
+  digitalWrite(14, HIGH);
   Serial.begin(115200);            //enable serial port.
   Wire.begin();                  //enable I2C port.
   
