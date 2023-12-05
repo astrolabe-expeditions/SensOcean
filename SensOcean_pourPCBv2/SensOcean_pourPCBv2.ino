@@ -816,8 +816,8 @@ void lecture_config(){
     
     while (confFile.available()) {
       x = confFile.read();
-      if (x!=10){
-        if (x!=13) {
+      if (byte(x))!=3){
+        if (byte(x)!=10) {
           phrase[index] = x;
           index++;
         } else {
