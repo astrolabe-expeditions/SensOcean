@@ -760,7 +760,7 @@ void mes_temp_int(){                         // température interne du boitier
 
 void mes_pressure(){                         // capteur meteo, température et pression de l'air
   // init sensor
-  if (!bmp.begin()) {
+  if (!bmp.begin(0x76)) {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring!"));
   }
   
